@@ -1,0 +1,56 @@
+{
+  "name": "client",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "build": "tsc -b",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.5.2",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "main": "./out/extension.js",
+  "dependencies": {
+    "glob": "^11.0.0",
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.13.0",
+    "@stylistic/eslint-plugin": "^2.9.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20",
+    "eslint": "^9.13.0",
+    "mocha": "^10.3.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.16.0",
+    "@types/vscode": "^1.75.1",
+    "@vscode/test-electron": "^2.3.9"
+  },
+  "activationEvents": [
+    "onLanguage:recette"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "recette",
+        "aliases": [
+          "Recette"
+        ],
+        "extensions": [
+          ".rct"
+        ]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "recette",
+        "scopeName": "source.recette",
+        "path": "./syntaxes/recette.tmLanguage.json"
+      }
+    ]
+  }
+}

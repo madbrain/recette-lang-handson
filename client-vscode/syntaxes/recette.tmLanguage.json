@@ -1,0 +1,14 @@
+{
+    "scopeName": "source.recette",
+    "patterns": [
+      {
+        "name": "markup.heading.title.recette",
+        "match": "^\\s*#\\s+.*$"
+      },
+      {
+        "name": "markup.heading.section.recette",
+        "match": "^\\s*##\\s+.*$"
+      }
+    ]
+  }
+  

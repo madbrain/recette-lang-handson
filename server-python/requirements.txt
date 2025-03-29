@@ -1,0 +1,2 @@
+pygls>=2.0.0a2
+pytest
