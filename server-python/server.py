@@ -13,6 +13,10 @@ class Span:
     start: int
     end: int
 
+    def __contains__(self, offset: int):
+        return self.start <= offset and offset < self.end
+
+
 def mergeRange(ranges):
     start = min(map(lambda x: x.start, ranges))
     end = max(map(lambda x: x.end, ranges))
@@ -30,11 +34,16 @@ class ErrorReporter:
         line = 0
         character = offset
         for i in range(len(self.line_offsets)):
-            if offset < self.line_offsets[i+1]:
+            if i+1 == len(self.line_offsets) or offset < self.line_offsets[i+1]:
                 character -= self.line_offsets[line]
                 break
             line += 1
         return types.Position(line=line, character=character)
+    
+    def to_offset(self, position: types.Position):
+        if position.line >= len(self.line_offsets):
+            return 0
+        return self.line_offsets[position.line] + position.character
     
     def addError(self, range: Span, message: str):
          self.diagnostics.append(
@@ -166,6 +175,9 @@ VERBS = {
     'cuire': False
 }
 
+IN_VERB = 1
+IN_ARG = 2
+
 class RecetteLanguageServer(LanguageServer):
 
     def __init__(self):
@@ -175,6 +187,32 @@ class RecetteLanguageServer(LanguageServer):
         recette = RecetteParser(reporter, doc.source).parse()
         self.validate(recette, reporter)
         return recette
+    
+    def locate_cursor(self, recette: Recette, offset: int, reporter: ErrorReporter):
+        for section in recette.sections:
+            for sentence in section.statements:
+                if offset in sentence.words[0].range:
+                    return (IN_VERB, sentence) 
+                if offset in sentence.range or reporter.to_position(offset).line == reporter.to_position(sentence.range.end).line:
+                    return (IN_ARG, sentence)
+        return (IN_VERB, None)
+    
+    def complete(self, doc: TextDocument, position: types.Position):
+        reporter = ErrorReporter(doc)
+        recette = RecetteParser(reporter, doc.source).parse()
+        offset = reporter.to_offset(position)
+        mode, sentence = self.locate_cursor(recette, offset, reporter)
+        if mode == IN_VERB:
+            return list(map(lambda verb: types.CompletionItem(kind=types.CompletionItemKind.Operator, label=verb), VERBS.keys()))
+        if mode == IN_ARG:
+            verb = sentence.words[0].value
+            if verb in ADVERB:
+                return list(map(lambda tool: types.CompletionItem(kind=types.CompletionItemKind.Class, label=tool), TOOLS))
+            if verb in VERBS.keys() and VERBS[verb]:
+                ing_section = next(section for section in recette.sections if section.value == "ingrédients")
+                if ing_section:
+                    return list(map(lambda ingredient: types.CompletionItem(kind=types.CompletionItemKind.Field, label=ingredient.words[0].value), ing_section.statements))
+        return []
     
     def validate(self, recette: Recette, reporter: ErrorReporter):
         ingredients = {
@@ -280,6 +318,12 @@ def did_change(ls: RecetteLanguageServer, params: types.DidOpenTextDocumentParam
             diagnostics=reporter.diagnostics,
         )
     )
+
+@server.feature(types.TEXT_DOCUMENT_COMPLETION)
+def do_completion(ls: RecetteLanguageServer, params: types.CompletionParams | None = None) -> types.CompletionList:
+    doc = ls.workspace.get_text_document(params.text_document.uri)
+    items = ls.complete(doc, params.position)
+    return types.CompletionList(is_incomplete=False, items=items)
 
 logging.basicConfig(filename='pygls.log', filemode='w', level=logging.INFO)
 

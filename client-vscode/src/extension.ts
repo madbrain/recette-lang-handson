@@ -1,61 +1,62 @@
-/* --------------------------------------------------------------------------------------------
- * Copyright (c) Microsoft Corporation. All rights reserved.
- * Licensed under the MIT License. See License.txt in the project root for license information.
- * ------------------------------------------------------------------------------------------ */
-
-import * as path from 'path';
-import { workspace, ExtensionContext } from 'vscode';
+import * as path from "path";
+import { ExtensionContext } from "vscode";
 
 import {
-	LanguageClient,
-	LanguageClientOptions,
-	ServerOptions,
-	TransportKind
-} from 'vscode-languageclient/node';
+  LanguageClient,
+  LanguageClientOptions,
+  ServerOptions,
+  TransportKind,
+} from "vscode-languageclient/node";
 
 let client: LanguageClient;
 
+function createNodeServer(context: ExtensionContext): ServerOptions {
+  const serverModule = context.asAbsolutePath(
+    path.join("..", "server-node", "out", "server.js")
+  );
+  return {
+    run: { module: serverModule, transport: TransportKind.ipc },
+    debug: {
+      module: serverModule,
+      transport: TransportKind.ipc,
+    },
+  };
+}
+
+function createPythonServer(): ServerOptions {
+  return {
+    command:
+      "/home/ludo/Projects/LSP/recette-lang-handson/server-python/env/bin/python3",
+    args: [
+      "/home/ludo/Projects/LSP/recette-lang-handson/server-python/server.py",
+    ],
+    // options: {
+    //   cwd: "/home/ludo/tmp/LSP/asm-lsp-server",
+    // },
+  };
+}
+
 export function activate(context: ExtensionContext) {
-	// The server is implemented in node
-	const serverModule = context.asAbsolutePath(
-		path.join('..', 'server-node', 'out', 'server.js')
-	);
+  //   const serverOptions = createNodeServer(context);
+  const serverOptions = createPythonServer();
 
-	// If the extension is launched in debug mode then the debug server options are used
-	// Otherwise the run options are used
-	const serverOptions: ServerOptions = {
-		run: { module: serverModule, transport: TransportKind.ipc },
-		debug: {
-			module: serverModule,
-			transport: TransportKind.ipc,
-		}
-	};
+  const clientOptions: LanguageClientOptions = {
+    documentSelector: [{ scheme: "file", language: "recette" }],
+  };
 
-	// Options to control the language client
-	const clientOptions: LanguageClientOptions = {
-		// Register the server for plain text documents
-		documentSelector: [{ scheme: 'file', language: 'plaintext' }],
-		synchronize: {
-			// Notify the server about file changes to '.clientrc files contained in the workspace
-			fileEvents: workspace.createFileSystemWatcher('**/.clientrc')
-		}
-	};
+  client = new LanguageClient(
+    "recette-lang-server",
+    "Recette Language Server",
+    serverOptions,
+    clientOptions
+  );
 
-	// Create the language client and start the client.
-	client = new LanguageClient(
-		'languageServerExample',
-		'Language Server Example',
-		serverOptions,
-		clientOptions
-	);
-
-	// Start the client. This will also launch the server
-	client.start();
+  client.start();
 }
 
 export function deactivate(): Thenable<void> | undefined {
-	if (!client) {
-		return undefined;
-	}
-	return client.stop();
+  if (!client) {
+    return undefined;
+  }
+  return client.stop();
 }
