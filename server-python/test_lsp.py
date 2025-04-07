@@ -6,6 +6,8 @@ from pygls.lsp.client import BaseLanguageClient
 import pytest
 import textwrap
 import re
+import json
+from functools import cmp_to_key
 
 class LanguageClient(BaseLanguageClient):
     """Language client to use for testing."""
@@ -34,10 +36,10 @@ class LanguageClient(BaseLanguageClient):
         assert initialize_result.capabilities.completion_provider is not None
 
 async def create_client():
-    cmds = [
-        "/home/ludo/Projects/LSP/recette-lang-handson/server-python/env/bin/python",
-        "/home/ludo/Projects/LSP/recette-lang-handson/server-python/server.py"
-    ]
+    config = None
+    with open("../config.json") as f:
+        config = json.load(f)
+    cmds = [ config["command"], *config["args"] ]
     client = LanguageClient(cmds)
     
     @client.feature(types.TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS)
@@ -330,5 +332,31 @@ async def test_complete_ingredient():
                     label=ingredient), expected_ingredients))
     )
 
-# TODO Goto
-# https://github.com/openlawlibrary/pygls/blob/main/examples/servers/goto.py
+@pytest.mark.asyncio
+async def test_rename_ingredient():
+    client = await create_client()
+    text, positions, ranges = code("""\
+            # title
+            ## ingrédients
+            @<3>chocolat@<3>
+            poulet
+            ## section
+            mélanger @<2>cho@{1}colat@<2>
+            touiller chocolat
+            """)
+    test_uri = help_text_open(client, text)
+    prepare_result = await client.text_document_prepare_rename_async(types.PrepareRenameParams(
+        text_document=types.TextDocumentIdentifier(uri=test_uri),
+        position=positions[1]
+    ))
+    assert prepare_result == ranges[2]
+    rename_result = await client.text_document_rename_async(types.RenameParams(
+        text_document=types.TextDocumentIdentifier(uri=test_uri),
+        position=positions[1],
+        new_name="poireau"
+    ))
+    assert sorted(rename_result.changes[test_uri], key=cmp_to_key(lambda a,b: b.range.start.line - a.range.start.line)) == [
+        types.TextEdit(range=ranges[2], new_text="poireau"),
+        types.TextEdit(range=ranges[3], new_text="poireau"),
+    ]
+

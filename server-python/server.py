@@ -6,7 +6,7 @@ from pygls.lsp.server import LanguageServer
 from pygls.workspace import TextDocument
 from lsprotocol import types
 from dataclasses import dataclass, field
-
+from collections import defaultdict
 
 @dataclass
 class Span:
@@ -245,49 +245,55 @@ class RecetteLanguageServer(LanguageServer):
                     else:
                         reporter.addError(sentence.words[0].range, "unknown verb or adverb")
 
+    def prepare_rename(self, doc: TextDocument, position: types.Position) -> types.Range | None:
+        reporter = ErrorReporter(doc)
+        recette = RecetteParser(reporter, doc.source).parse()
+        ingredients = self.make_ingredients(recette)
+        offset = reporter.to_offset(position)
+        word = self.locate_ingredient(ingredients, offset)
+        if word:
+            r = types.Range(start=reporter.to_position(word.range.start), end=reporter.to_position(word.range.end))
+            logging.info(str(r))
+            return r
+        return None
+    
+    def rename(self, doc: TextDocument, position: types.Position, new_text: str) -> types.WorkspaceEdit | None:
+        reporter = ErrorReporter(doc)
+        recette = RecetteParser(reporter, doc.source).parse()
+        ingredients = self.make_ingredients(recette)
+        target = doc.word_at_position(position)
+        if target in ingredients:
+            edits = [ types.TextEdit(types.Range(start=reporter.to_position(word.range.start), end=reporter.to_position(word.range.end)), new_text) for word in ingredients[target] ]
+            return types.WorkspaceEdit({
+                doc.uri: edits
+            })
+        return None
+    
+    # TODO merge with validate
+    def make_ingredients(self, recette: Recette):
+        ingredients = defaultdict(lambda: [])
+        for section in recette.sections:
+            if section.value == "ingrédients":
+                for sentence in section.statements:
+                    ing = sentence.words[0]
+                    ingredients[ing.value].append(ing) # TODO dissociate definition from uses
+            else:
+                for sentence in section.statements:        
+                    name = sentence.words[0].value 
+                    if name in VERBS.keys() and VERBS[name]:
+                        for ing in sentence.words[1:]:
+                            ingredients[ing.value].append(ing)
+        return ingredients
+    
+    def locate_ingredient(self, ingredients, offset):
+        for k, words in ingredients.items():
+            for word in words:
+                if offset in word.range:
+                    return word
+        return None
+
 
 server = RecetteLanguageServer()
-
-
-ADDITION = re.compile(r"^\s*(\d+)\s*\+\s*(\d+)\s*=(?=\s*$)")
-
-@server.feature(
-    types.TEXT_DOCUMENT_CODE_ACTION,
-    types.CodeActionOptions(code_action_kinds=[types.CodeActionKind.QuickFix]),
-)
-def code_actions(params: types.CodeActionParams):
-    items = []
-    document_uri = params.text_document.uri
-    document = server.workspace.get_text_document(document_uri)
-
-    start_line = params.range.start.line
-    end_line = params.range.end.line
-
-    lines = document.lines[start_line : end_line + 1]
-    for idx, line in enumerate(lines):
-        match = ADDITION.match(line)
-        if match is not None:
-            range_ = types.Range(
-                start=types.Position(line=start_line + idx, character=0),
-                end=types.Position(line=start_line + idx, character=len(line) - 1),
-            )
-
-            left = int(match.group(1))
-            right = int(match.group(2))
-            answer = left + right
-
-            text_edit = types.TextEdit(
-                range=range_, new_text=f"{line.strip()} {answer}!"
-            )
-
-            action = types.CodeAction(
-                title=f"Evaluate '{match.group(0)}'",
-                kind=types.CodeActionKind.QuickFix,
-                edit=types.WorkspaceEdit(changes={document_uri: [text_edit]}),
-            )
-            items.append(action)
-
-    return items
 
 
 @server.feature(types.TEXT_DOCUMENT_DID_OPEN)
@@ -324,6 +330,16 @@ def do_completion(ls: RecetteLanguageServer, params: types.CompletionParams | No
     doc = ls.workspace.get_text_document(params.text_document.uri)
     items = ls.complete(doc, params.position)
     return types.CompletionList(is_incomplete=False, items=items)
+
+@server.feature(types.TEXT_DOCUMENT_PREPARE_RENAME)
+def do_completion(ls: RecetteLanguageServer, params: types.PrepareRenameParams) -> types.Range | None:
+    doc = ls.workspace.get_text_document(params.text_document.uri)
+    return ls.prepare_rename(doc, params.position)
+
+@server.feature(types.TEXT_DOCUMENT_RENAME)
+def do_completion(ls: RecetteLanguageServer, params: types.RenameParams) -> types.WorkspaceEdit | None:
+    doc = ls.workspace.get_text_document(params.text_document.uri)
+    return ls.rename(doc, params.position, params.new_name)
 
 logging.basicConfig(filename='pygls.log', filemode='w', level=logging.INFO)
 
