@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LSP Tester UI</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet" />
+    <link href="bootstrap-icons.min.css" rel="stylesheet" />
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css"
+    />
+
+    <style>
+      body {
+        height: 100%;
+      }
+
+      aside {
+        /* border: 1px yellow solid; */
+        position: fixed;
+        overflow: auto;
+        height: calc(100vh - 68px);
+        justify-content: flex-start;
+        align-self: flex-start;
+      }
+
+      main {
+        position: relative;
+        overflow: auto;
+        margin-left: auto;
+        justify-content: flex-end;
+        align-self: flex-end;
+      }
+    </style>
+    <script src="//unpkg.com/alpinejs" defer></script>
+    <!-- <script
+      type="text/javascript"
+      src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html-ui.min.js"
+    ></script> -->
+    <script
+      type="text/javascript"
+      src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html.min.js"
+    ></script>
+  </head>
+  <body x-data="uiModel">
+    <nav class="navbar sticky-top navbar-expand-lg bg-body-tertiary">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="#">LSP Tester UI</a>
+        <form class="d-inline-flex gap-1" role="actions">
+          <button
+            class="btn btn-primary btn-success"
+            type="button"
+            @click="start"
+            x-bind:disabled="running"
+          >
+            Start
+          </button>
+          <button
+            class="btn btn-outline-warning"
+            type="button"
+            @click="stop"
+            x-bind:disabled="!running"
+          >
+            Stop
+          </button>
+        </form>
+      </div>
+    </nav>
+
+    <aside class="col-sm-3 p-3 border-end">
+      <ul class="nav nav-pills flex-column mb-auto">
+        <template x-for="test in tests" :key="test.id">
+          <li class="nav-item">
+            <a
+              href="#"
+              class="nav-link link-body-emphasis"
+              x-on:click="current = test; updateTooltip()"
+            >
+              <i
+                :class="test.failed ? 'bi-bookmark-x-fill' : 'bi-bookmark-check-fill'"
+                :style="test.failed ? 'color: red' : 'color: green'"
+              ></i
+              >&nbsp;<span x-text="test.name"></span>
+            </a>
+          </li>
+        </template>
+      </ul>
+    </aside>
+
+    <main class="col-sm-9">
+      <div class="container-fluid">
+        <template x-if="current">
+          <div>
+            <div x-html="current.content"></div>
+            <h2>Expected results</h2>
+            <div class="card">
+              <div class="card-body">
+                <div x-html="current.context"></div>
+              </div>
+            </div>
+            <template x-if="current.errors.length > 0"
+              ><h2 class="py-2">Errors</h2></template
+            >
+            <template x-for="error in current.errors">
+              <div class="py-2">
+                <div x-html="computeDiff(error)"></div>
+              </div>
+            </template>
+          </div>
+        </template>
+        <template x-if="!current">
+          <div class="px-4 py-5 my-5 text-center">
+            <h1 class="display-5 fw-bold">LSP Tester UI</h1>
+            <div class="col-lg-6 mx-auto">
+              <p class="lead mb-4">
+                Start testing your LSP server by pressing the « Start » button.
+              </p>
+              <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+                <button
+                  class="btn btn-primary btn-success"
+                  type="button"
+                  @click="start"
+                  x-bind:disabled="running"
+                >
+                  Start
+                </button>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </main>
+
+    <script src="js/bootstrap.bundle.min.js"></script>
+
+    <script>
+      document.addEventListener("alpine:init", () => {
+        Alpine.data("uiModel", () => ({
+          eventSource: null,
+          running: false,
+          tests: [],
+          current: null,
+
+          updateTooltip() {
+            setTimeout(() => {
+              const tooltipTriggerList = document.querySelectorAll(
+                '[data-bs-toggle="tooltip"]'
+              );
+              const tooltipList = [...tooltipTriggerList].map(
+                (tooltipTriggerEl) => new bootstrap.Tooltip(tooltipTriggerEl)
+              );
+            }, 0);
+          },
+
+          start() {
+            this.running = !this.running;
+            if (this.eventSource) {
+              this.eventSource.close();
+            }
+            this.tests = [];
+            this.eventSource = new EventSource("/start");
+
+            this.eventSource.onmessage = (event) => {
+              const newElement = document.createElement("li");
+              const data = JSON.parse(event.data);
+              if (data.end) {
+                if (!this.current) {
+                  this.current = this.tests[this.tests.length - 1];
+                }
+                this.stop();
+              } else {
+                console.log(data);
+                this.tests = [...this.tests, data];
+              }
+            };
+
+            this.eventSource.onerror = (event) => {
+              console.log("Error occurred:", event);
+            };
+          },
+
+          stop() {
+            this.running = !this.running;
+            if (this.eventSource) {
+              this.eventSource.close();
+            }
+            this.eventSource = null;
+          },
+
+          computeDiff(diff) {
+            return Diff2Html.html(diff, {
+              inputFormat: "diff",
+              matching: "lines",
+              outputFormat: "side-by-side",
+              highlight: true,
+              drawFileList: false,
+            });
+          },
+        }));
+      });
+    </script>
+  </body>
+</html>
