@@ -1,4 +1,4 @@
-import { ChildProcess, spawn } from "child_process";
+import { ChildProcess, ChildProcessWithoutNullStreams, spawn } from "child_process";
 import { JSONRPCEndpoint } from "./jsonRpcEndpoint";
 import * as config from "../../../config.json";
 import {
@@ -17,7 +17,7 @@ import { TestClientHelper } from "./helper";
 import { TestDescription, tests } from "../tests";
 
 export class Client {
-  diagnostics: PublishDiagnosticsParams;
+  diagnostics?: PublishDiagnosticsParams;
 
   constructor(
     private endpoint: JSONRPCEndpoint,
@@ -29,6 +29,7 @@ export class Client {
   }
 
   async initialize() {
+    this.diagnostics = undefined;
     return await this.endpoint.send("initialize", {
       processId: this.process.pid,
       capabilities: {},
@@ -75,16 +76,21 @@ export interface TestResult {
   failed: boolean;
   test: TestDescription;
   context: string;
-  errors: { message: string; diff: any }[];
-}
+  errors: TestError[];
+  }
+
+export type TestError = { type: 'diff', diff: any } | { type: 'simple', message: string };
+
+let process: ChildProcessWithoutNullStreams | null = null;
 
 export async function startClient(
   testCallback: (r: TestResult) => void,
   endCallback: () => void
 ) {
-  const controller = new AbortController();
-  const { signal } = controller;
-  const process = spawn(config.command, config.args, { signal });
+  process = spawn(config.command, config.args, { cwd: config.cwd });
+  process.stderr.on('data', d => {
+    console.log("SERVER", d.toString())
+  })
   const endpoint = new JSONRPCEndpoint(process.stdin, process.stdout);
   const client = new Client(endpoint, process);
 
@@ -102,13 +108,33 @@ export async function startClient(
       testCallback({ index: index, failed: false, test, context, errors: [] });
     } catch (e) {
       const context = helper.buildHtmlContext();
-      const diff = helper.buildDiff(e.description, e.actual, e.expected);
+      const errors: TestError[] = [];
+      if (e.description && e.actual && e.expected) {
+        errors.push({ type: 'diff', diff: helper.buildDiff(e.description, e.actual, e.expected) });
+      } else {
+        console.log("ERROR", e);
+        let message = "";
+        if (e.description) {
+          message = e.description as string;
+          if (e.emssage) {
+            message = `${message}: ${e.message}`;
+          }
+        } else if (e.message) {
+          message = e.message as string;
+        }
+
+        if (e.data) {
+          message += '\n' + e.data as string;
+        }
+        
+        errors.push({ type: 'simple', message });
+      }
       testCallback({
         index: index,
         failed: true,
         test,
         context,
-        errors: [diff],
+        errors,
       });
     }
     // TODO client clean docs
@@ -117,9 +143,13 @@ export async function startClient(
   endCallback();
 
   client.exit();
-  // controller.abort(); TODO abort not working
+  stopClient();
 }
 
 export function stopClient() {
-  console.log("TODO stop client");
+  if (process) {
+    process.stdin.end(() => {})
+    process.kill();
+    process = null;
+  }
 }

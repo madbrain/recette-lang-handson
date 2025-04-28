@@ -105,7 +105,12 @@
             >
             <template x-for="error in current.errors">
               <div class="py-2">
-                <div x-html="computeDiff(error)"></div>
+                <template x-if="error.type == 'simple'">
+                  <pre x-text="error.message"></pre>
+                </template>
+                <template x-if="error.type == 'diff'">
+                  <div x-html="computeDiff(error.diff)"></div>
+                </template>
               </div>
             </template>
           </div>
@@ -160,6 +165,7 @@
               this.eventSource.close();
             }
             this.tests = [];
+            this.current = undefined;
             this.eventSource = new EventSource("/start");
 
             this.eventSource.onmessage = (event) => {
