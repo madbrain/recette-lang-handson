@@ -1,7 +1,7 @@
 import { Diagnostic, Position, Range } from "./models";
 import { Client } from "./client";
 import * as Diff from "diff";
-import { wrap } from "./expect";
+import { asyncWrap, wrap } from "./expect";
 import { expect } from "earl";
 
 export interface TestContext {
@@ -27,18 +27,38 @@ export class TestClientHelper {
     return testUri;
   }
 
+  async waitDiagnostics() {
+    return new Promise((resolve, error) => {
+      let count = 0;
+      const id = setInterval(() => {
+        if (this.client.diagnostics) {
+          clearInterval(id);
+          resolve({})
+        } else if (count++ > 10) {
+          clearInterval(id);
+          error({})
+        }
+      }, 100);
+    });
+  }
+
   async testDiagnostics(text: string, expectedDiagnostics: Diagnostic[]) {
     this.context = {
       text,
       diagnostics: expectedDiagnostics,
     };
     const test_uri = await this.openTextDocument(text);
-    await new Promise((resolve) => setTimeout(() => resolve({}), 50));
+
+    await asyncWrap("Timeout waiting for diagnostics ", () => this.waitDiagnostics());
+
+    wrap("Must have received diagnostics ", () =>
+      expect(this.client.diagnostics).not.toBeNullish()
+    );
     wrap("Diagnostics must be from correct document", () =>
-      expect(this.client.diagnostics.uri).toEqual(test_uri)
+      expect(this.client.diagnostics?.uri).toEqual(test_uri)
     );
     wrap("Diagnostics must be correct", () =>
-      expect(this.client.diagnostics.diagnostics).toEqual(expectedDiagnostics)
+      expect(this.client.diagnostics?.diagnostics).toEqual(expectedDiagnostics)
     );
   }
 
@@ -75,7 +95,7 @@ export class TestClientHelper {
     return result;
   }
 
-  buildDiff(name: string, actual: string, expected: string) {
+  buildDiff(name: string, actual: string, expected: string): any {
     return Diff.createPatch(name, expected, actual);
   }
 }
