@@ -1,4 +1,8 @@
-import { ChildProcess, ChildProcessWithoutNullStreams, spawn } from "child_process";
+import {
+  ChildProcess,
+  ChildProcessWithoutNullStreams,
+  spawn,
+} from "child_process";
 import { JSONRPCEndpoint } from "./jsonRpcEndpoint";
 import * as config from "../../../config.json";
 import {
@@ -11,6 +15,8 @@ import {
   PublishDiagnosticsParams,
   RenameParams,
   WorkspaceEdit,
+  InitializeResult,
+  ServerCapabilities,
 } from "./models";
 
 import { TestClientHelper } from "./helper";
@@ -18,6 +24,7 @@ import { TestDescription, tests } from "../tests";
 
 export class Client {
   diagnostics?: PublishDiagnosticsParams;
+  severCapabilities: ServerCapabilities;
 
   constructor(
     private endpoint: JSONRPCEndpoint,
@@ -28,9 +35,9 @@ export class Client {
     });
   }
 
-  async initialize() {
+  async initialize(): Promise<InitializeResult> {
     this.diagnostics = undefined;
-    return await this.endpoint.send("initialize", {
+    const response: InitializeResult = await this.endpoint.send("initialize", {
       processId: this.process.pid,
       capabilities: {},
       clientInfo: {
@@ -38,6 +45,8 @@ export class Client {
         version: "0.0.1",
       },
     });
+    this.severCapabilities = response.capabilities;
+    return response;
   }
 
   exit() {
@@ -77,9 +86,11 @@ export interface TestResult {
   test: TestDescription;
   context: string;
   errors: TestError[];
-  }
+}
 
-export type TestError = { type: 'diff', diff: any } | { type: 'simple', message: string };
+export type TestError =
+  | { type: "diff"; diff: any }
+  | { type: "simple"; message: string };
 
 let process: ChildProcessWithoutNullStreams | null = null;
 
@@ -88,16 +99,15 @@ export async function startClient(
   endCallback: () => void
 ) {
   process = spawn(config.command, config.args, { cwd: config.cwd });
-  process.stderr.on('data', d => {
-    console.log("SERVER", d.toString())
-  })
+  process.stderr.on("data", (d) => {
+    console.log("SERVER", d.toString());
+  });
   const endpoint = new JSONRPCEndpoint(process.stdin, process.stdout);
   const client = new Client(endpoint, process);
 
-  const resp = await client.initialize();
-  console.log("INIT", resp);
-
   const helper = new TestClientHelper(client);
+
+  await helper.initialize();
 
   let index = 0;
   for (let test of tests) {
@@ -110,7 +120,10 @@ export async function startClient(
       const context = helper.buildHtmlContext();
       const errors: TestError[] = [];
       if (e.description && e.actual && e.expected) {
-        errors.push({ type: 'diff', diff: helper.buildDiff(e.description, e.actual, e.expected) });
+        errors.push({
+          type: "diff",
+          diff: helper.buildDiff(e.description, e.actual, e.expected),
+        });
       } else {
         console.log("ERROR", e);
         let message = "";
@@ -124,10 +137,10 @@ export async function startClient(
         }
 
         if (e.data) {
-          message += '\n' + e.data as string;
+          message += ("\n" + e.data) as string;
         }
-        
-        errors.push({ type: 'simple', message });
+
+        errors.push({ type: "simple", message });
       }
       testCallback({
         index: index,
@@ -148,7 +161,7 @@ export async function startClient(
 
 export function stopClient() {
   if (process) {
-    process.stdin.end(() => {})
+    process.stdin.end(() => {});
     process.kill();
     process = null;
   }

@@ -3,6 +3,7 @@ import { Client } from "./client";
 import * as Diff from "diff";
 import { asyncWrap, wrap } from "./expect";
 import { expect } from "earl";
+import { skip } from "node:test";
 
 export interface TestContext {
   text: string;
@@ -13,6 +14,11 @@ export class TestClientHelper {
   context: TestContext | undefined;
 
   constructor(public client: Client) {}
+
+  async initialize() {
+    const resp = await this.client.initialize();
+    console.log("INIT", resp);
+  }
 
   async openTextDocument(text: string) {
     const testUri = "file:///test.rct";
@@ -33,10 +39,10 @@ export class TestClientHelper {
       const id = setInterval(() => {
         if (this.client.diagnostics) {
           clearInterval(id);
-          resolve({})
+          resolve({});
         } else if (count++ > 10) {
           clearInterval(id);
-          error({})
+          error({});
         }
       }, 100);
     });
@@ -49,7 +55,9 @@ export class TestClientHelper {
     };
     const test_uri = await this.openTextDocument(text);
 
-    await asyncWrap("Timeout waiting for diagnostics ", () => this.waitDiagnostics());
+    await asyncWrap("Timeout waiting for diagnostics ", () =>
+      this.waitDiagnostics()
+    );
 
     wrap("Must have received diagnostics ", () =>
       expect(this.client.diagnostics).not.toBeNullish()
@@ -100,38 +108,41 @@ export class TestClientHelper {
   }
 }
 
-export function code(content: string) {
+function stripMargin(content: string) {
+  let result = "";
+  let index = 0;
+  let startOfLine = true;
   let margin: number | undefined = undefined;
-  function stripMargin(content: string) {
-    let result = "";
-    let index = 0;
-    let startOfLine = true;
-    let m = margin;
-    while (index < content.length) {
-      const c = content[index++];
-      if (c == " " || c == "\t") {
-        if (startOfLine) {
-          if (m === undefined) {
-            margin = (margin || 0) + 1;
-          } else if (m > 0) {
-            --m;
-          } else {
-            result += c;
-          }
+  let stripCount: number | undefined = margin;
+  const isSpace = (c) => c == " " || c == "\t";
+  while (index < content.length) {
+    const c = content[index++];
+    let skip = false;
+    if (isSpace(c) && startOfLine) {
+      if (stripCount != 0) {
+        skip = true;
+        if (stripCount === undefined) {
+          margin = (margin || 0) + 1;
         } else {
-          result += c;
+          --stripCount;
         }
-      } else if (c == "\n") {
-        startOfLine = true;
-        result += c;
-        m = margin;
-      } else {
-        startOfLine = false;
-        result += c;
       }
+    } else if (c == "\n") {
+      startOfLine = true;
+      stripCount = margin;
+    } else {
+      startOfLine = false;
+      margin = margin || 0;
     }
-    return result;
+    if (!skip) {
+      result += c;
+    }
   }
+  return result;
+}
+
+export function code(text: string) {
+  const content = stripMargin(text);
   const current: Position = { line: 0, character: 0 };
   function update(s: string, current: Position) {
     for (let i = 0; i < s.length; ++i) {
@@ -154,17 +165,11 @@ export function code(content: string) {
     m = POSITION_REGEXP.exec(content);
     if (m) {
       if (m[1]) {
-        result += update(
-          stripMargin(content.substring(lastIndex, m.index)),
-          current
-        );
+        result += update(content.substring(lastIndex, m.index), current);
         positions[parseInt(m[1])] = { ...current };
         lastIndex = m.index + m[0].length;
       } else {
-        result += update(
-          stripMargin(content.substring(lastIndex, m.index)),
-          current
-        );
+        result += update(content.substring(lastIndex, m.index), current);
         const index = parseInt(m[2]);
         if (starts[index]) {
           ranges[index] = { start: starts[index], end: { ...current } };
@@ -174,7 +179,7 @@ export function code(content: string) {
         lastIndex = m.index + m[0].length;
       }
     } else {
-      const r = update(stripMargin(content.substring(lastIndex)), current);
+      const r = update(content.substring(lastIndex), current);
       result += r;
     }
   } while (m);

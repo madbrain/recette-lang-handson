@@ -173,7 +173,9 @@
               const data = JSON.parse(event.data);
               if (data.end) {
                 if (!this.current) {
-                  this.current = this.tests[this.tests.length - 1];
+                  this.current =
+                    this.tests.find((t) => t.failed) ||
+                    this.tests[this.tests.length - 1];
                 }
                 this.stop();
               } else {

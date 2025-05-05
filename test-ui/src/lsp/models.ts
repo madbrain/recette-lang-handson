@@ -68,6 +68,81 @@ export interface TextDocumentItem {
   text: string;
 }
 
+export interface InitializeResult {
+  /**
+   * The capabilities the language server provides.
+   */
+  capabilities: ServerCapabilities;
+
+  /**
+   * Information about the server.
+   *
+   * @since 3.15.0
+   */
+  serverInfo?: {
+    /**
+     * The name of the server as defined by the server.
+     */
+    name: string;
+
+    /**
+     * The server's version as defined by the server.
+     */
+    version?: string;
+  };
+}
+
+export interface ServerCapabilities {
+  textDocumentSync?: TextDocumentSyncOptions | TextDocumentSyncKind;
+
+  /**
+   * The server provides completion support.
+   */
+  completionProvider?: CompletionOptions;
+}
+
+export interface TextDocumentSyncOptions {
+  /**
+   * Open and close notifications are sent to the server. If omitted open
+   * close notifications should not be sent.
+   */
+  openClose?: boolean;
+
+  /**
+   * Change notifications are sent to the server. See
+   * TextDocumentSyncKind.None, TextDocumentSyncKind.Full and
+   * TextDocumentSyncKind.Incremental. If omitted it defaults to
+   * TextDocumentSyncKind.None.
+   */
+  change?: TextDocumentSyncKind;
+}
+
+/**
+ * Defines how the host (editor) should sync document changes to the language
+ * server.
+ */
+export namespace TextDocumentSyncKind {
+  /**
+   * Documents should not be synced at all.
+   */
+  export const None = 0;
+
+  /**
+   * Documents are synced by always sending the full content
+   * of the document.
+   */
+  export const Full = 1;
+
+  /**
+   * Documents are synced by sending the full content on open.
+   * After that only incremental updates to the document are
+   * sent.
+   */
+  export const Incremental = 2;
+}
+
+export type TextDocumentSyncKind = 0 | 1 | 2;
+
 export interface PublishDiagnosticsParams {
   /**
    * The URI for which diagnostic information is reported.
@@ -207,6 +282,62 @@ export interface DiagnosticRelatedInformation {
    * The message of this related diagnostic information.
    */
   message: string;
+}
+
+/**
+ * Completion options.
+ */
+export interface CompletionOptions {
+  /**
+   * The additional characters, beyond the defaults provided by the client (typically
+   * [a-zA-Z]), that should automatically trigger a completion request. For example
+   * `.` in JavaScript represents the beginning of an object property or method and is
+   * thus a good candidate for triggering a completion request.
+   *
+   * Most tools trigger a completion request automatically without explicitly
+   * requesting it using a keyboard shortcut (e.g. Ctrl+Space). Typically they
+   * do so when the user starts to type an identifier. For example if the user
+   * types `c` in a JavaScript file code complete will automatically pop up
+   * present `console` besides others as a completion item. Characters that
+   * make up identifiers don't need to be listed here.
+   */
+  triggerCharacters?: string[];
+
+  /**
+   * The list of all possible characters that commit a completion. This field
+   * can be used if clients don't support individual commit characters per
+   * completion item. See client capability
+   * `completion.completionItem.commitCharactersSupport`.
+   *
+   * If a server provides both `allCommitCharacters` and commit characters on
+   * an individual completion item the ones on the completion item win.
+   *
+   * @since 3.2.0
+   */
+  allCommitCharacters?: string[];
+
+  /**
+   * The server provides support to resolve additional
+   * information for a completion item.
+   */
+  resolveProvider?: boolean;
+
+  /**
+   * The server supports the following `CompletionItem` specific
+   * capabilities.
+   *
+   * @since 3.17.0
+   */
+  completionItem?: {
+    /**
+     * The server has support for completion item label
+     * details (see also `CompletionItemLabelDetails`) when receiving
+     * a completion item in a resolve call.
+     *
+     * @since 3.17.0
+     */
+    labelDetailsSupport?: boolean;
+  };
 }
 
 /**
