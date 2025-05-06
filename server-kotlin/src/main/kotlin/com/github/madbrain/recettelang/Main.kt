@@ -2,11 +2,12 @@ package com.github.madbrain.recettelang
 
 import org.eclipse.lsp4j.*
 import org.eclipse.lsp4j.jsonrpc.Launcher
+import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.*
 import java.util.concurrent.CompletableFuture
 
 
-open class IncrementalTextDocumentService: TextDocumentService {
+open class IncrementalTextDocumentService : TextDocumentService {
 
     protected var documents = mutableMapOf<String, TextDocumentItem>()
 
@@ -49,11 +50,26 @@ class RecetteLangServer : LanguageServer, LanguageClientAware {
             super.didChange(params)
             documents[params.textDocument.uri]?.let { validate(it) }
         }
+
+        override fun completion(position: CompletionParams?): CompletableFuture<Either<List<CompletionItem>, CompletionList>> {
+            return CompletableFuture.completedFuture(Either.forRight(CompletionList(
+                VERBS.map { label -> createCompletionItem(CompletionItemKind.Function, label) }
+                        + ADVERBS.map { label -> createCompletionItem(CompletionItemKind.Operator, label) }
+            )))
+        }
+
+        private fun createCompletionItem(kind: CompletionItemKind, label: String): CompletionItem {
+            val item = CompletionItem(label)
+            item.kind = kind
+            return item
+        }
+
     }
 
     override fun initialize(params: InitializeParams?): CompletableFuture<InitializeResult> {
         val capabilities = ServerCapabilities()
         capabilities.setTextDocumentSync(TextDocumentSyncKind.Full)
+        capabilities.completionProvider = CompletionOptions()
         return CompletableFuture.completedFuture(InitializeResult(capabilities));
     }
 
@@ -82,10 +98,9 @@ class RecetteLangServer : LanguageServer, LanguageClientAware {
         this.client = client
     }
 
+
     private fun validate(document: TextDocumentItem) {
-        val diag = Diagnostic(Range(Position(0, 0), Position(0, 10)), "Zenika rulez")
-        diag.severity = DiagnosticSeverity.Information
-        client.publishDiagnostics(PublishDiagnosticsParams(document.uri, listOf(diag)))
+        client.publishDiagnostics(PublishDiagnosticsParams(document.uri, validateRecette(document)))
     }
 
 }
