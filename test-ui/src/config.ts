@@ -15,18 +15,33 @@ select({
   let config: any = {};
   const projectRoot = resolve(__dirname, "../..");
   switch (answer) {
-    case "python": {
-      const pythonRoot = resolve(projectRoot, "server-python");
-      config.cwd = pythonRoot;
-      config.command = resolve(pythonRoot, "env/bin/python3");
-      config.args = [resolve(pythonRoot, "server.py")];
-    }
+    case "python":
+      {
+        const pythonRoot = resolve(projectRoot, "server-python");
+        config.cwd = pythonRoot;
+        config.command = resolve(pythonRoot, "env/bin/python3");
+        config.args = [resolve(pythonRoot, "server.py")];
+      }
       break;
-      case "kotlin": {
+    case "kotlin":
+      {
         const kotlinRoot = resolve(projectRoot, "server-kotlin");
         config.cwd = kotlinRoot;
         config.command = resolve(kotlinRoot, "gradlew");
-        config.args = [ "--console=plain", "--quiet", "run"];
+        config.args = ["--console=plain", "--quiet", "run"];
+      }
+      break;
+    case "rust":
+      {
+        const kotlinRoot = resolve(projectRoot, "server-rust");
+        config.cwd = kotlinRoot;
+        config.command = "cargo";
+        config.args = ["-q", "run"];
+      }
+      break;
+    case "node-js":
+      {
+        config.command = "server-node";
       }
       break;
     default:
