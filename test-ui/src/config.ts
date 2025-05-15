@@ -29,6 +29,13 @@ select({
         config.args = [ "--console=plain", "--quiet", "run"];
       }
       break;
+      case "rust": {
+        const kotlinRoot = resolve(projectRoot, "server-rust");
+        config.cwd = kotlinRoot;
+        config.command = "cargo";
+        config.args = [ "-q", "run"];
+      }
+      break;
     default:
       throw new Error(`TODO: unsupported server type`);
   }

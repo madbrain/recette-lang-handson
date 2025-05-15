@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "pnpm --stream -r run build"
+    "build": "pnpm --stream -r run build",
+    "config": "pnpm --filter test-ui run config",
+    "start": "pnpm --filter test-ui run dev"
   },
   "keywords": [],
   "author": "",
