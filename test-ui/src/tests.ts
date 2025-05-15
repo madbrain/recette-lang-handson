@@ -2,6 +2,7 @@ import { expect } from "earl";
 import { wrap } from "./lsp/expect";
 import { code, TestClientHelper } from "./lsp/helper";
 import {
+  CompletionItem,
   CompletionItemKind,
   Diagnostic,
   DiagnosticSeverity,
@@ -20,7 +21,7 @@ export const tests: TestDescription[] = [
     doc: `# Title already defined
 A recipe must have a title. As in [Markdown](https://fr.wikipedia.org/wiki/Markdown)
 it starts on a new line with a single \`#\`. Only one title can be defined, the message
-\`title already defined\` must be reported on following titles.
+\`title already defined\` must be reported on other titles than the first one.
 `,
     run: async (helper) => {
       const { text, ranges } = code(`\
@@ -40,8 +41,33 @@ it starts on a new line with a single \`#\`. Only one title can be defined, the 
   },
 
   {
+    name: "Title already defined with spaces",
+    doc: `# Title already defined with spaces
+Title and section headers don't have to start of on first character, they can be precedeed by optional spaces.
+Empty lines are ignored.
+`,
+    run: async (helper) => {
+      const { text, ranges } = code(`\
+            # hello
+            
+               @<1># tutu@<1>
+            `);
+      const expected = [
+        {
+          range: ranges[1],
+          severity: DiagnosticSeverity.Error,
+          message: "title already defined",
+        },
+      ] as Diagnostic[];
+
+      await helper.testDiagnostics(text, expected);
+    },
+  },
+
+  {
     name: "Test dandling section",
-    doc: `# Test dandling section`,
+    doc: `# Test dandling section
+A section which starts with \`##\` must be defined after the title.`,
     run: async (helper) => {
       const { text, ranges } = code(`\
             @<1>## hello@<1>
@@ -60,7 +86,8 @@ it starts on a new line with a single \`#\`. Only one title can be defined, the 
 
   {
     name: "Test dandling statement",
-    doc: `# Test dandling statement`,
+    doc: `# Test dandling statement
+Each instruction line (sequence of words for now) must be contained in a section.`,
     run: async (helper) => {
       const { text, ranges } = code(`\
             @<1>hello@<1>
@@ -80,13 +107,12 @@ it starts on a new line with a single \`#\`. Only one title can be defined, the 
   {
     name: "Test parse unknown verb",
     doc: `# Test parse unknown verb
-    Each instruction in a section is a series of words separated by spaces. First word must be a either a verb or an adverb.
-    `,
+Each instruction in a section is a series of words separated by spaces. First word must be a either a verb or an adverb.`,
     run: async (helper) => {
       const { text, ranges } = code(`\
         # title
         ## section
-        @<1>hello@<1>
+        @<1>hello@<1> world
         `);
       const expected = [
         {
@@ -100,11 +126,24 @@ it starts on a new line with a single \`#\`. Only one title can be defined, the 
   },
 
   {
+    name: "Test can complete",
+    doc: `# Test can complete
+In order to do completion the server must implement the \`textDocument/completion\` operation`,
+    run: async (helper) => {
+      wrap("Server must have completion capabilities", () => {
+        expect(
+          helper.client.severCapabilities.completionProvider
+        ).not.toBeNullish();
+      });
+    },
+  },
+
+  {
     name: "Test complete verb",
     doc: `# Test complete verb
-    When a completion is started on the first word, the list of verbs must be proposed.
+When a completion is started on the first word, the list of verbs must be proposed.
     
-    No need to filter on the word prefix, most client (VSCode does) will only display matching words.`,
+No need to filter on the word prefix, most client (VSCode does) will only display matching words.`,
     run: async (helper) => {
       const { text, positions } = code(`\
         # title
@@ -116,23 +155,22 @@ it starts on a new line with a single \`#\`. Only one title can be defined, the 
         textDocument: { uri: testUri },
         position: positions[1],
       });
-      const expectedVerbs = [
-        "verser",
-        "touiller",
-        "malaxer",
-        "mélanger",
-        "incorporer",
-        "étaler",
-        "fondre",
-        "cuire",
+      const expectedVerbs: CompletionItem[] = [
+        { label: "verser", kind: CompletionItemKind.Function },
+        { label: "touiller", kind: CompletionItemKind.Function },
+        { label: "malaxer", kind: CompletionItemKind.Function },
+        { label: "mélanger", kind: CompletionItemKind.Function },
+        { label: "incorporer", kind: CompletionItemKind.Function },
+        { label: "étaler", kind: CompletionItemKind.Function },
+        { label: "fondre", kind: CompletionItemKind.Function },
+        { label: "cuire", kind: CompletionItemKind.Function },
+        { label: "avec", kind: CompletionItemKind.Operator },
+        { label: "dans", kind: CompletionItemKind.Operator },
       ];
       wrap("Completion items must be correct", () =>
         expect(result).toEqual({
           isIncomplete: false,
-          items: expectedVerbs.map((verb) => ({
-            kind: CompletionItemKind.Operator,
-            label: verb,
-          })),
+          items: expectedVerbs,
         })
       );
     },
@@ -141,10 +179,7 @@ it starts on a new line with a single \`#\`. Only one title can be defined, the 
   {
     name: "Test parse missing tools",
     doc: `# Test parse missing tools
-Some verbs must be followed by a tool, here is words recognized as tools :
-* XX
-* YY
-* ZZ`,
+Adverbs must be followed by a second word known as tool.`,
     run: async (helper) => {
       const { text, ranges } = code(`\
         # title
@@ -166,9 +201,12 @@ Some verbs must be followed by a tool, here is words recognized as tools :
   {
     name: "Test report unknown tools",
     doc: `# Test report unknown tools
-Give the list of tools:
-* XX
-* YY`,
+Here are words recognized as tools :
+* saladier
+* cuillère
+* plat
+* mixeur
+* four`,
     run: async (helper) => {
       const { text, ranges } = code(`\
         # title
@@ -219,7 +257,10 @@ When the instruction expect a tool (in second word), the tool can be completed f
   {
     name: "Test that verb need ingredient",
     doc: `# Test that verb need ingredient
-Some verbs require ingredients`,
+Some verbs require ingredients:
+* verser
+* mélanger
+* fondre`,
     run: async (helper) => {
       const { text, ranges } = code(`\
         # title
@@ -240,7 +281,8 @@ Some verbs require ingredients`,
 
   {
     name: "Test parse unknown ingredient",
-    doc: ``,
+    doc: `# Test parse unknown ingredient
+Ingredients must first be defined to used`,
     run: async (helper) => {
       const { text, ranges } = code(`\
         # title
@@ -287,7 +329,8 @@ Each ingredient must declared only once.`,
 
   {
     name: "Test complete ingredient",
-    doc: ``,
+    doc: `# Test complete ingredient
+Completion when expecting an ingredient should only porposed defined ingredients`,
     run: async (helper) => {
       const { text, positions } = code(`\
         # title
