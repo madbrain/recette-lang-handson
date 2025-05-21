@@ -1,5 +1,6 @@
 import * as path from "path";
 import { ExtensionContext } from "vscode";
+import { readFileSync } from "fs";
 
 import {
   LanguageClient,
@@ -10,35 +11,33 @@ import {
 
 let client: LanguageClient;
 
-function createNodeServer(context: ExtensionContext): ServerOptions {
-  const serverModule = context.asAbsolutePath(
-    path.join("..", "server-node", "out", "server.js")
+function createServer(context: ExtensionContext): ServerOptions {
+  const config = JSON.parse(
+    readFileSync(context.asAbsolutePath("../config.json"), "utf-8")
   );
+  if (config.command === "server-node") {
+    const serverModule = context.asAbsolutePath(
+      path.join("..", "server-node", "out", "server.js")
+    );
+    return {
+      run: { module: serverModule, transport: TransportKind.ipc },
+      debug: {
+        module: serverModule,
+        transport: TransportKind.ipc,
+      },
+    };
+  }
   return {
-    run: { module: serverModule, transport: TransportKind.ipc },
-    debug: {
-      module: serverModule,
-      transport: TransportKind.ipc,
+    command: config.command,
+    args: config.args,
+    options: {
+      cwd: config.cwd,
     },
   };
 }
 
-function createPythonServer(): ServerOptions {
-  return {
-    command:
-      "/home/ludo/Projects/LSP/recette-lang-handson/server-python/env/bin/python3",
-    args: [
-      "/home/ludo/Projects/LSP/recette-lang-handson/server-python/server.py",
-    ],
-    // options: {
-    //   cwd: "/home/ludo/tmp/LSP/asm-lsp-server",
-    // },
-  };
-}
-
 export function activate(context: ExtensionContext) {
-  //   const serverOptions = createNodeServer(context);
-  const serverOptions = createPythonServer();
+  const serverOptions = createServer(context);
 
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "recette" }],
