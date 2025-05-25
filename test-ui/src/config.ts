@@ -33,10 +33,18 @@ select({
       break;
     case "rust":
       {
-        const kotlinRoot = resolve(projectRoot, "server-rust");
-        config.cwd = kotlinRoot;
+        const rustRoot = resolve(projectRoot, "server-rust");
+        config.cwd = rustRoot;
         config.command = "cargo";
         config.args = ["-q", "run"];
+      }
+      break;
+    case "go":
+      {
+        const goRoot = resolve(projectRoot, "server-go");
+        config.cwd = goRoot;
+        config.command = "go";
+        config.args = ["run", "main.go"];
       }
       break;
     case "node-js":
