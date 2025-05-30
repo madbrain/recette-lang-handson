@@ -70,6 +70,27 @@ export class TestClientHelper {
     );
   }
 
+  setCompletionContext(inputText: string, position: Position) {
+    const text = inputText
+      .split("\n")
+      .map((content, line) => {
+        if (line === position.line) {
+          return (
+            content.substring(0, position.character) +
+            "\u2038" +
+            content.substring(position.character)
+          );
+        } else {
+          return content;
+        }
+      })
+      .join("\n");
+    this.context = {
+      text,
+      diagnostics: [],
+    };
+  }
+
   buildHtmlContext(): string {
     if (!this.context) {
       return "";

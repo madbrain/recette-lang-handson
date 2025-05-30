@@ -128,8 +128,9 @@ Each instruction in a section is a series of words separated by spaces. First wo
   {
     name: "Test can complete",
     doc: `# Test can complete
-In order to do completion the server must implement the \`textDocument/completion\` operation`,
+In order to do completion, the server must declare the \`completionProvider\` capability and implement the \`textDocument/completion\` operation`,
     run: async (helper) => {
+      helper.context = undefined;
       wrap("Server must have completion capabilities", () => {
         expect(
           helper.client.severCapabilities.completionProvider
@@ -150,6 +151,7 @@ No need to filter on the word prefix, most client (VSCode does) will only displa
         ## section
         ma@{1}la
         `);
+      helper.setCompletionContext(text, positions[1]);
       const testUri = await helper.openTextDocument(text);
       const result = await helper.client.textDocumentCompletion({
         textDocument: { uri: testUri },
@@ -236,6 +238,7 @@ When the instruction expect a tool (in second word), the tool can be completed f
         dans sa@{1}
         malaxer
         `);
+      helper.setCompletionContext(text, positions[1]);
       const testUri = await helper.openTextDocument(text);
       const result = await helper.client.textDocumentCompletion({
         textDocument: { uri: testUri },
@@ -340,6 +343,7 @@ Completion when expecting an ingredient should only porposed defined ingredients
         ## section
         mélanger @{1} 
         `);
+      helper.setCompletionContext(text, positions[1]);
       const testUri = await helper.openTextDocument(text);
       const result = await helper.client.textDocumentCompletion({
         textDocument: { uri: testUri },
@@ -359,6 +363,28 @@ Completion when expecting an ingredient should only porposed defined ingredients
   },
 
   {
+    name: "Test can rename",
+    doc: `# Test can rename
+In order to do rename refactoring, the server must declare the \`renameProvider\` capability and implement the \`textDocument/prepareRename\` and \`textDocument/rename\` operations`,
+    run: async (helper) => {
+      helper.context = {
+        text: `{
+  renameProvider: { prepareProvider: true }
+}`,
+        diagnostics: [],
+      };
+      wrap("Server must have rename capabilities", () => {
+        expect(
+          helper.client.severCapabilities.renameProvider
+        ).not.toBeNullish();
+        expect(helper.client.severCapabilities.renameProvider).toEqual({
+          prepareProvider: true,
+        });
+      });
+    },
+  },
+
+  {
     name: "Test rename ingredient",
     doc: `# Test rename ingredient
 Ingredients could be renamed, but only words interpreted as an ingredient should be renamed.`,
@@ -372,6 +398,7 @@ Ingredients could be renamed, but only words interpreted as an ingredient should
         mélanger @<2>cho@{1}colat@<2>
         touiller chocolat
         `);
+      helper.setCompletionContext(text, positions[1]);
       const testUri = await helper.openTextDocument(text);
       const prepareResult = await helper.client.textDocumentPrepareRename({
         textDocument: { uri: testUri },

@@ -99,6 +99,20 @@ export interface ServerCapabilities {
    * The server provides completion support.
    */
   completionProvider?: CompletionOptions;
+
+  /**
+   * The server provides rename support. RenameOptions may only be
+   * specified if the client states that it supports
+   * `prepareSupport` in its initial `initialize` request.
+   */
+  renameProvider?: boolean | RenameOptions;
+}
+
+export interface RenameOptions {
+  /**
+   * Renames should be checked and tested before being executed.
+   */
+  prepareProvider?: boolean;
 }
 
 export interface TextDocumentSyncOptions {
