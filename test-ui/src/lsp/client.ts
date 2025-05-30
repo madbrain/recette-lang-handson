@@ -39,7 +39,9 @@ export class Client {
     this.diagnostics = undefined;
     const response: InitializeResult = await this.endpoint.send("initialize", {
       processId: this.process.pid,
-      capabilities: {},
+      capabilities: {
+        textDocument: { rename: { prepareSupport: true } },
+      },
       clientInfo: {
         name: "lsp-client-tester",
         version: "0.0.1",
