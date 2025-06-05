@@ -49,7 +49,10 @@ select({
       break;
     case "node-js":
       {
-        config.command = "server-node";
+        const nodeRoot = resolve(projectRoot, "server-node");
+        config.cwd = nodeRoot;
+        config.command = "npm";
+        config.args = ["run", "--silent", "run"];
       }
       break;
     default:
