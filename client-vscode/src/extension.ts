@@ -15,7 +15,7 @@ function createServer(context: ExtensionContext): ServerOptions {
   const config = JSON.parse(
     readFileSync(context.asAbsolutePath("../config.json"), "utf-8")
   );
-  if (config.command === "server-node") {
+  if (config.command === "npm") {
     const serverModule = context.asAbsolutePath(
       path.join("..", "server-node", "out", "server.js")
     );

@@ -179,6 +179,43 @@ No need to filter on the word prefix, most client (VSCode does) will only displa
   },
 
   {
+    name: "Test complete verb on empty line",
+    doc: `# Test complete verb on empty line
+When a completion is started on an empty line, the list of verbs must be proposed.`,
+    run: async (helper) => {
+      const { text, positions } = code(`\
+        # title
+        ## section
+        @{1}
+        `);
+      helper.setCompletionContext(text, positions[1]);
+      const testUri = await helper.openTextDocument(text);
+      const result = await helper.client.textDocumentCompletion({
+        textDocument: { uri: testUri },
+        position: positions[1],
+      });
+      const expectedVerbs: CompletionItem[] = [
+        { label: "verser", kind: CompletionItemKind.Function },
+        { label: "touiller", kind: CompletionItemKind.Function },
+        { label: "malaxer", kind: CompletionItemKind.Function },
+        { label: "mélanger", kind: CompletionItemKind.Function },
+        { label: "incorporer", kind: CompletionItemKind.Function },
+        { label: "étaler", kind: CompletionItemKind.Function },
+        { label: "fondre", kind: CompletionItemKind.Function },
+        { label: "cuire", kind: CompletionItemKind.Function },
+        { label: "avec", kind: CompletionItemKind.Operator },
+        { label: "dans", kind: CompletionItemKind.Operator },
+      ];
+      wrap("Completion items must be correct", () =>
+        expect(result).toEqual({
+          isIncomplete: false,
+          items: expectedVerbs,
+        })
+      );
+    },
+  },
+
+  {
     name: "Test parse missing tools",
     doc: `# Test parse missing tools
 Adverbs must be followed by a second word known as tool.`,
@@ -353,10 +390,41 @@ Completion when expecting an ingredient should only porposed defined ingredients
       wrap("Completion items must be correct", () =>
         expect(result).toEqual({
           isIncomplete: false,
-          items: expectedIngredients.map((verb) => ({
+          items: expectedIngredients.map((ingredient) => ({
             kind: CompletionItemKind.Field,
-            label: verb,
+            label: ingredient,
           })),
+        })
+      );
+    },
+  },
+
+  {
+    name: "Test complete ingredient list with unknown ingredients",
+    doc: `# Test complete ingredient list with unknown ingredients
+When a completion is started in ingredient section, the list of unknown ingredients must be proposed.`,
+    run: async (helper) => {
+      const { text, positions } = code(`\
+        # title
+        ## ingrédients
+        lait
+        @{1}
+        ## section
+        fondre beurre
+        `);
+      helper.setCompletionContext(text, positions[1]);
+      const testUri = await helper.openTextDocument(text);
+      const result = await helper.client.textDocumentCompletion({
+        textDocument: { uri: testUri },
+        position: positions[1],
+      });
+      const expectedIngredients: CompletionItem[] = [
+        { label: "beurre", kind: CompletionItemKind.Field },
+      ];
+      wrap("Completion items must be correct", () =>
+        expect(result).toEqual({
+          isIncomplete: false,
+          items: expectedIngredients,
         })
       );
     },
