@@ -31,6 +31,7 @@ connection.onInitialize((params: InitializeParams) => {
       textDocumentSync: TextDocumentSyncKind.Incremental,
       completionProvider: {},
       renameProvider: { prepareProvider: true },
+      codeActionProvider: { codeActionKinds: [CodeActionKind.QuickFix] },
     },
   };
   return result;
@@ -153,6 +154,77 @@ connection.onRenameRequest((params) => {
   };
 });
 
+connection.onCodeAction((params) => {
+  const doc = documents.get(params.textDocument.uri);
+  if (!doc) {
+    return null;
+  }
+  const recette = parse(doc.getText(), []);
+  const diagnostics = params.context.diagnostics.filter(
+    (diag) =>
+      diag.source === DIAG_SOURCE && diag.code === ErrorCodes.UNKNOWN_INGREDIENT
+  );
+  const section = findIngredientsSection(recette);
+  if (section) {
+    const lastRange = section.sentences[section.sentences.length - 1].range;
+    const insertPoint: Position = {
+      line: lastRange.end.line + 1,
+      character: 0,
+    };
+    return diagnostics.map((diag) => ({
+      title: "Add ingredient",
+      kind: CodeActionKind.QuickFix,
+      diagnostics: [diag],
+      edit: {
+        changes: {
+          [params.textDocument.uri]: [
+            {
+              range: { start: insertPoint, end: insertPoint },
+              newText: (diag.data as string) + "\n",
+            },
+          ],
+        },
+      },
+    }));
+  } else {
+    const lastRange = recette.title?.range;
+    if (lastRange) {
+      const insertPoint: Position = {
+        line: lastRange.end.line + 1,
+        character: 0,
+      };
+      return diagnostics.map((diag) => ({
+        title: "Add ingredient",
+        kind: CodeActionKind.QuickFix,
+        diagnostics: [diag],
+        edit: {
+          changes: {
+            [params.textDocument.uri]: [
+              {
+                range: { start: insertPoint, end: insertPoint },
+                newText:
+                  `## ${INGREDIENTS_SECTION_NAME}\n` +
+                  (diag.data as string) +
+                  "\n",
+              },
+            ],
+          },
+        },
+      }));
+    }
+  }
+  return null;
+});
+
+function findIngredientsSection(recette: Recette): Section | null {
+  for (let section of recette.sections) {
+    if (section.name === INGREDIENTS_SECTION_NAME) {
+      return section;
+    }
+  }
+  return null;
+}
+
 function findInRecette(recette: Recette, position: Position) {
   let lastSection = null;
   for (let section of recette.sections) {
@@ -186,6 +258,12 @@ function contains(range: Range, position: Position) {
     range.start.character <= position.character &&
     position.character <= range.end.character
   );
+}
+
+const DIAG_SOURCE = "rct-lang";
+
+enum ErrorCodes {
+  UNKNOWN_INGREDIENT = "E0001",
 }
 
 const INGREDIENTS_SECTION_NAME = "ingrédients";
@@ -274,6 +352,7 @@ function parse(text: string, diagnostics: Diagnostic[]): Recette {
             range: newTitle.range,
             message: "title already defined",
             severity: DiagnosticSeverity.Error,
+            source: DIAG_SOURCE,
           });
         } else {
           title = newTitle;
@@ -292,6 +371,7 @@ function parse(text: string, diagnostics: Diagnostic[]): Recette {
             range: newSection.range,
             message: "must come after title",
             severity: DiagnosticSeverity.Error,
+            source: DIAG_SOURCE,
           });
         } else {
           sections.push(newSection);
@@ -327,6 +407,7 @@ function parse(text: string, diagnostics: Diagnostic[]): Recette {
             range: range,
             message: "must be in a section",
             severity: DiagnosticSeverity.Error,
+            source: DIAG_SOURCE,
           });
         } else {
           const currentSentence: Sentence = {
@@ -387,6 +468,7 @@ function validate(recette: Recette, diagnostics: Diagnostic[]) {
             range: sentence.words[0].range,
             message: "duplicated ingredient",
             severity: DiagnosticSeverity.Error,
+            source: DIAG_SOURCE,
           });
         } else {
           ingredients.push(name);
@@ -401,6 +483,7 @@ function validate(recette: Recette, diagnostics: Diagnostic[]) {
                 range: sentence.words[0].range,
                 message: "need ingredient(s)",
                 severity: DiagnosticSeverity.Error,
+                source: DIAG_SOURCE,
               });
             } else {
               for (let index = 1; index < sentence.words.length; ++index) {
@@ -414,6 +497,9 @@ function validate(recette: Recette, diagnostics: Diagnostic[]) {
                     range: word.range,
                     message: "unknown ingredient",
                     severity: DiagnosticSeverity.Error,
+                    source: DIAG_SOURCE,
+                    code: ErrorCodes.UNKNOWN_INGREDIENT,
+                    data: word.value,
                   });
                 }
               }
@@ -425,12 +511,14 @@ function validate(recette: Recette, diagnostics: Diagnostic[]) {
               range: sentence.words[0].range,
               message: "missing tool",
               severity: DiagnosticSeverity.Error,
+              source: DIAG_SOURCE,
             });
           } else if (!TOOLS.includes(sentence.words[1].value)) {
             diagnostics.push({
               range: sentence.words[1].range,
               message: "unknown tool",
               severity: DiagnosticSeverity.Error,
+              source: DIAG_SOURCE,
             });
           }
         } else {
@@ -438,6 +526,7 @@ function validate(recette: Recette, diagnostics: Diagnostic[]) {
             range: sentence.words[0].range,
             message: "unknown verb or adverb",
             severity: DiagnosticSeverity.Error,
+            source: DIAG_SOURCE,
           });
         }
       });

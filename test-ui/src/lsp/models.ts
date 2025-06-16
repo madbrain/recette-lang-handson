@@ -106,6 +106,13 @@ export interface ServerCapabilities {
    * `prepareSupport` in its initial `initialize` request.
    */
   renameProvider?: boolean | RenameOptions;
+
+  /**
+   * The server provides code actions. The `CodeActionOptions` return type is
+   * only valid if the client signals code action literal support via the
+   * property `textDocument.codeAction.codeActionLiteralSupport`.
+   */
+  codeActionProvider?: boolean | CodeActionOptions;
 }
 
 export interface RenameOptions {
@@ -113,6 +120,278 @@ export interface RenameOptions {
    * Renames should be checked and tested before being executed.
    */
   prepareProvider?: boolean;
+}
+
+export interface CodeActionOptions {
+  /**
+   * CodeActionKinds that this server may return.
+   *
+   * The list of kinds may be generic, such as `CodeActionKind.Refactor`,
+   * or the server may list out every specific kind they provide.
+   */
+  codeActionKinds?: CodeActionKind[];
+
+  /**
+   * The server provides support to resolve additional
+   * information for a code action.
+   *
+   * @since 3.16.0
+   */
+  resolveProvider?: boolean;
+}
+
+/**
+ * Params for the CodeActionRequest
+ */
+export interface CodeActionParams {
+  /**
+   * The document in which the command was invoked.
+   */
+  textDocument: TextDocumentIdentifier;
+
+  /**
+   * The range for which the command was invoked.
+   */
+  range: Range;
+
+  /**
+   * Context carrying additional information.
+   */
+  context: CodeActionContext;
+}
+
+/**
+ * Contains additional diagnostic information about the context in which
+ * a code action is run.
+ */
+export interface CodeActionContext {
+  /**
+   * An array of diagnostics known on the client side overlapping the range
+   * provided to the `textDocument/codeAction` request. They are provided so
+   * that the server knows which errors are currently presented to the user
+   * for the given range. There is no guarantee that these accurately reflect
+   * the error state of the resource. The primary parameter
+   * to compute code actions is the provided range.
+   */
+  diagnostics: Diagnostic[];
+
+  /**
+   * Requested kind of actions to return.
+   *
+   * Actions not of this kind are filtered out by the client before being
+   * shown. So servers can omit computing them.
+   */
+  only?: CodeActionKind[];
+
+  /**
+   * The reason why code actions were requested.
+   *
+   * @since 3.17.0
+   */
+  triggerKind?: CodeActionTriggerKind;
+}
+
+/**
+ * The reason why code actions were requested.
+ *
+ * @since 3.17.0
+ */
+export namespace CodeActionTriggerKind {
+  /**
+   * Code actions were explicitly requested by the user or by an extension.
+   */
+  export const Invoked: 1 = 1;
+
+  /**
+   * Code actions were requested automatically.
+   *
+   * This typically happens when current selection in a file changes, but can
+   * also be triggered when file content changes.
+   */
+  export const Automatic: 2 = 2;
+}
+
+export type CodeActionTriggerKind = 1 | 2;
+
+/**
+ * The kind of a code action.
+ *
+ * Kinds are a hierarchical list of identifiers separated by `.`,
+ * e.g. `"refactor.extract.function"`.
+ *
+ * The set of kinds is open and client needs to announce the kinds it supports
+ * to the server during initialization.
+ */
+export type CodeActionKind = string;
+
+/**
+ * A set of predefined code action kinds.
+ */
+export namespace CodeActionKind {
+  /**
+   * Empty kind.
+   */
+  export const Empty: CodeActionKind = "";
+
+  /**
+   * Base kind for quickfix actions: 'quickfix'.
+   */
+  export const QuickFix: CodeActionKind = "quickfix";
+
+  /**
+   * Base kind for refactoring actions: 'refactor'.
+   */
+  export const Refactor: CodeActionKind = "refactor";
+
+  /**
+   * Base kind for refactoring extraction actions: 'refactor.extract'.
+   *
+   * Example extract actions:
+   *
+   * - Extract method
+   * - Extract function
+   * - Extract variable
+   * - Extract interface from class
+   * - ...
+   */
+  export const RefactorExtract: CodeActionKind = "refactor.extract";
+
+  /**
+   * Base kind for refactoring inline actions: 'refactor.inline'.
+   *
+   * Example inline actions:
+   *
+   * - Inline function
+   * - Inline variable
+   * - Inline constant
+   * - ...
+   */
+  export const RefactorInline: CodeActionKind = "refactor.inline";
+
+  /**
+   * Base kind for refactoring rewrite actions: 'refactor.rewrite'.
+   *
+   * Example rewrite actions:
+   *
+   * - Convert JavaScript function to class
+   * - Add or remove parameter
+   * - Encapsulate field
+   * - Make method static
+   * - Move method to base class
+   * - ...
+   */
+  export const RefactorRewrite: CodeActionKind = "refactor.rewrite";
+
+  /**
+   * Base kind for source actions: `source`.
+   *
+   * Source code actions apply to the entire file.
+   */
+  export const Source: CodeActionKind = "source";
+
+  /**
+   * Base kind for an organize imports source action:
+   * `source.organizeImports`.
+   */
+  export const SourceOrganizeImports: CodeActionKind = "source.organizeImports";
+
+  /**
+   * Base kind for a 'fix all' source action: `source.fixAll`.
+   *
+   * 'Fix all' actions automatically fix errors that have a clear fix that
+   * do not require user input. They should not suppress errors or perform
+   * unsafe fixes such as generating new types or classes.
+   *
+   * @since 3.17.0
+   */
+  export const SourceFixAll: CodeActionKind = "source.fixAll";
+}
+
+/**
+ * A code action represents a change that can be performed in code, e.g. to fix
+ * a problem or to refactor code.
+ *
+ * A CodeAction must set either `edit` and/or a `command`. If both are supplied,
+ * the `edit` is applied first, then the `command` is executed.
+ */
+export interface CodeAction {
+  /**
+   * A short, human-readable, title for this code action.
+   */
+  title: string;
+
+  /**
+   * The kind of the code action.
+   *
+   * Used to filter code actions.
+   */
+  kind?: CodeActionKind;
+
+  /**
+   * The diagnostics that this code action resolves.
+   */
+  diagnostics?: Diagnostic[];
+
+  /**
+   * Marks this as a preferred action. Preferred actions are used by the
+   * `auto fix` command and can be targeted by keybindings.
+   *
+   * A quick fix should be marked preferred if it properly addresses the
+   * underlying error. A refactoring should be marked preferred if it is the
+   * most reasonable choice of actions to take.
+   *
+   * @since 3.15.0
+   */
+  isPreferred?: boolean;
+
+  /**
+   * Marks that the code action cannot currently be applied.
+   *
+   * Clients should follow the following guidelines regarding disabled code
+   * actions:
+   *
+   * - Disabled code actions are not shown in automatic lightbulbs code
+   *   action menus.
+   *
+   * - Disabled actions are shown as faded out in the code action menu when
+   *   the user request a more specific type of code action, such as
+   *   refactorings.
+   *
+   * - If the user has a keybinding that auto applies a code action and only
+   *   a disabled code actions are returned, the client should show the user
+   *   an error message with `reason` in the editor.
+   *
+   * @since 3.16.0
+   */
+  disabled?: {
+    /**
+     * Human readable description of why the code action is currently
+     * disabled.
+     *
+     * This is displayed in the code actions UI.
+     */
+    reason: string;
+  };
+
+  /**
+   * The workspace edit this code action performs.
+   */
+  edit?: WorkspaceEdit;
+
+  /**
+   * A command this code action executes. If a code action
+   * provides an edit and a command, first the edit is
+   * executed and then the command.
+   */
+  //command?: Command;
+
+  /**
+   * A data entry field that is preserved on a code action between
+   * a `textDocument/codeAction` and a `codeAction/resolve` request.
+   *
+   * @since 3.16.0
+   */
+  data?: LSPAny;
 }
 
 export interface TextDocumentSyncOptions {

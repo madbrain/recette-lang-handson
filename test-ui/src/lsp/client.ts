@@ -17,6 +17,9 @@ import {
   WorkspaceEdit,
   InitializeResult,
   ServerCapabilities,
+  CodeActionOptions,
+  CodeActionParams,
+  CodeAction,
 } from "./models";
 
 import { TestClientHelper } from "./helper";
@@ -79,6 +82,12 @@ export class Client {
       "textDocument/rename",
       params
     ) as Promise<WorkspaceEdit | null>;
+  }
+
+  textDocumentCodeAction(params: CodeActionParams) {
+    return this.endpoint.send("textDocument/codeAction", params) as Promise<
+      CodeAction[] | null
+    >;
   }
 }
 

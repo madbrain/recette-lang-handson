@@ -2,6 +2,7 @@ import { expect } from "earl";
 import { wrap } from "./lsp/expect";
 import { code, TestClientHelper } from "./lsp/helper";
 import {
+  CodeActionKind,
   CompletionItem,
   CompletionItemKind,
   Diagnostic,
@@ -488,6 +489,81 @@ Ingredients could be renamed, but only words interpreted as an ingredient should
         ).toEqual([
           { range: ranges[2], newText: "poireau" },
           { range: ranges[3], newText: "poireau" },
+        ])
+      );
+    },
+  },
+
+  {
+    name: "Test can do quickfix",
+    doc: `# Test can quickfix
+In order to do quickfix refactoring, the server must declare the \`codeActionProvider\` capability and implement the \`textDocument/codeActions\` operation`,
+    run: async (helper) => {
+      helper.context = {
+        text: `{
+  codeActionProvider: { codeActionKinds: [ "quickfix" ] }
+}`,
+        diagnostics: [],
+      };
+      wrap("Server must have rename capabilities", () => {
+        expect(
+          helper.client.severCapabilities.codeActionProvider
+        ).not.toBeNullish();
+        expect(helper.client.severCapabilities.codeActionProvider).toEqual({
+          codeActionKinds: ["quickfix"],
+        });
+      });
+    },
+  },
+
+  {
+    name: "Test quick fix ingredient",
+    doc: `# Test quick fix ingredient
+Unknown ingredient could be automatically added to ingredient list.`,
+    run: async (helper) => {
+      const { text, positions, ranges } = code(`\
+        # title
+        ## ingrédients
+        lait
+        @<3>@<3>## section
+        fondre @<2>beu@<1>rr@<1>e@<2>
+        `);
+      const diagnostics = [
+        {
+          range: ranges[2],
+          message: "unknown ingredient",
+          severity: DiagnosticSeverity.Error,
+          source: "rct-lang",
+          code: "E0001",
+          data: "beurre",
+        },
+      ];
+      helper.setDiagnosticsContext(text, diagnostics);
+      const testUri = await helper.openTextDocument(text);
+      const codeActionResult = await helper.client.textDocumentCodeAction({
+        textDocument: { uri: testUri },
+        range: ranges[1],
+        context: {
+          diagnostics,
+        },
+      });
+      wrap("Code Action response must be correct", () =>
+        expect(codeActionResult).toEqual([
+          {
+            title: "Add ingredient",
+            kind: CodeActionKind.QuickFix,
+            diagnostics,
+            edit: {
+              changes: {
+                [testUri]: [
+                  {
+                    range: ranges[3],
+                    newText: "beurre\n",
+                  },
+                ],
+              },
+            },
+          },
         ])
       );
     },

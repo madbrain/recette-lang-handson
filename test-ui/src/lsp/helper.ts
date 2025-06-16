@@ -49,10 +49,7 @@ export class TestClientHelper {
   }
 
   async testDiagnostics(text: string, expectedDiagnostics: Diagnostic[]) {
-    this.context = {
-      text,
-      diagnostics: expectedDiagnostics,
-    };
+    this.setDiagnosticsContext(text, expectedDiagnostics);
     const test_uri = await this.openTextDocument(text);
 
     await asyncWrap("Timeout waiting for diagnostics ", () =>
@@ -68,6 +65,13 @@ export class TestClientHelper {
     wrap("Diagnostics must be correct", () =>
       expect(this.client.diagnostics?.diagnostics).toEqual(expectedDiagnostics)
     );
+  }
+
+  setDiagnosticsContext(text: string, expectedDiagnostics: Diagnostic[]) {
+    this.context = {
+      text,
+      diagnostics: expectedDiagnostics,
+    };
   }
 
   setCompletionContext(inputText: string, position: Position) {
