@@ -53,7 +53,7 @@ Using your server in VSCode require an extension, a minimal extension is provide
 
 ## Use NeoVim as client
 
-Add the following configuration to NeoVim:
+Add the following configuration to NeoVim (`$HOME/.config/nvim/init.lua`):
 
 ```lua
 vim.keymap.set('i', '<c-space>', '<c-x><c-o>')
