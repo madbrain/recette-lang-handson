@@ -480,15 +480,22 @@ Ingredients could be renamed, but only words interpreted as an ingredient should
         position: positions[1],
         newName: "poireau",
       });
-      wrap("Rename response must be correct", () =>
-        expect(
-          renameResult?.changes?.[testUri].sort(
+      const orderedResult = renameResult?.changes?.[testUri] ?{
+        changes: {
+          [testUri]: renameResult?.changes?.[testUri].sort(
             (a, b) => b.range.start.line - a.range.start.line
           )
-        ).toEqual([
-          { range: ranges[2], newText: "poireau" },
-          { range: ranges[3], newText: "poireau" },
-        ])
+        }
+      } : renameResult;
+      wrap("Rename response must be correct", () =>
+        expect(orderedResult).toEqual({
+          changes: {
+            [testUri]: [
+              { range: ranges[2], newText: "poireau" },
+              { range: ranges[3], newText: "poireau" },
+            ]
+          }
+        })
       );
     },
   },
