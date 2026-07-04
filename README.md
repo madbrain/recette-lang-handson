@@ -12,13 +12,13 @@ The goal of our LSP server will be to:
 
 - report errors instantly
 - allows user to complete words (as verbs, ingredients, etc.)
-- allows to rename ingredients globbaly in the recipe
+- allows to rename ingredients globally in the recipe
 
 In LSP terms, we will implement diagnostics, completion and rename features.
 
 ## Menu
 
-- Discover the LSP architecture and protocol
+- Discover the LSP architecture and protocol following [instructions](discover.md)
 - Install dependencies
 - Chose a target implementation language
 - Using the provided tests, implement your own language server

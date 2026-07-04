@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JSON-RPC Tester Tool</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet" />
+    <link href="bootstrap-icons.min.css" rel="stylesheet" />
+
+    <style>
+      body {
+        height: 100%;
+      }
+
+      main {
+        position: relative;
+        overflow: auto;
+        margin-left: auto;
+        justify-content: flex-end;
+        align-self: flex-end;
+        height: calc(100vh - 56px);
+      }
+    </style>
+    <script src="//unpkg.com/alpinejs" defer></script>
+  </head>
+  <body x-data="uiModel">
+    <nav class="navbar sticky-top navbar-expand-lg bg-body-tertiary">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="#">JSON-RPC Tester</a>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            <li class="nav-item">
+              <a class="nav-link" href="/">LSP Tester UI</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <main>
+      <div class="container h-100">
+        <div class="row h-100">
+          <div class="col-6">
+            <div class="alert alert-primary" role="alert">
+              <p>
+                Start the language server with
+                <a href="https://github.com/qualified/lsp-ws-proxy"
+                  >lsp-ws-proxy</a
+                >:
+              </p>
+              <div>
+                <pre>
+<code>npm install dockerfile-language-server-nodejs
+lsp-ws-proxy -- ./node_modules/.bin/docker-langserver --stdio</code></pre>
+              </div>
+            </div>
+            <form>
+              <div class="mb-3">
+                <label for="serverURI" class="form-label">Server URI</label>
+                <div class="input-group mb-3">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="serverURI"
+                    x-model="serverURI"
+                  />
+                  <button
+                    type="button"
+                    class="btn btn-primary"
+                    @click="connect"
+                    x-bind:disabled="running"
+                  >
+                    Connect
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-danger"
+                    @click="stop"
+                    x-bind:disabled="!running"
+                  >
+                    Stop
+                  </button>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label for="messageInput">Message</label>
+                <textarea
+                  class="form-control"
+                  id="messageInput"
+                  style="height: 300px"
+                  x-model="message"
+                ></textarea>
+              </div>
+              <div class="col-auto">
+                <button
+                  type="button"
+                  class="btn btn-primary mb-3"
+                  @click="send"
+                  x-bind:disabled="!running"
+                >
+                  Send
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="col-6 mh-100">
+            <div class="overflow-auto mh-100">
+              <template x-for="(message,index) in messages">
+                <div
+                  class="card"
+                  :class="message.type === 'from-client' ? 'bg-info' : 'bg-light'"
+                >
+                  <h5 class="card-header">
+                    <button
+                      class="btn btn-secondary"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      x-bind:data-bs-target="'#mes' + index"
+                      aria-expanded="false"
+                    >
+                      <i class="fa fa-chevron-down pull-right"></i>
+                      <span x-text="message.method"></span>
+                    </button>
+                  </h5>
+                  <div x-bind:id="'mes' + index" class="collapse show">
+                    <div class="card-body">
+                      <pre><code x-text="message.content"></code></pre>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script src="js/bootstrap.bundle.min.js"></script>
+
+    <script>
+      document.addEventListener("alpine:init", () => {
+        Alpine.data("uiModel", () => ({
+          serverURI: "ws://localhost:9999",
+          ws: null,
+          running: false,
+          message: `{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "capabilities": {"workspace": {}}}}`,
+          messages: [],
+
+          connect() {
+            if (this.ws) {
+              this.ws.close();
+            }
+            this.messages = [];
+            this.ws = new WebSocket(this.serverURI);
+            this.running = true;
+            console.log("Connected");
+
+            this.ws.addEventListener("message", (event) => {
+              this.messages.push({
+                type: "from-server",
+                ...this.getContent(event.data),
+              });
+            });
+
+            this.ws.addEventListener("error", (event) => {
+              console.log("Error occurred:", event);
+            });
+          },
+
+          stop() {
+            this.running = false;
+            if (this.ws) {
+              this.ws.close();
+            }
+            this.ws = null;
+          },
+
+          send() {
+            if (this.ws) {
+              this.messages.push({
+                type: "from-client",
+                ...this.getContent(this.message),
+              });
+              this.ws.send(this.message);
+            }
+          },
+
+          getContent(content) {
+            const message = JSON.parse(content);
+            return {
+              method: message.method ?? `Response ${message.id}`,
+              content: JSON.stringify(message, null, 2),
+            };
+          },
+        }));
+      });
+    </script>
+  </body>
+</html>
