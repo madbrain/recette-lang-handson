@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -35,10 +35,6 @@
       }
     </style>
     <script src="//unpkg.com/alpinejs" defer></script>
-    <!-- <script
-      type="text/javascript"
-      src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html-ui.min.js"
-    ></script> -->
     <script
       type="text/javascript"
       src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html.min.js"
@@ -48,6 +44,13 @@
     <nav class="navbar sticky-top navbar-expand-lg bg-body-tertiary">
       <div class="container-fluid">
         <a class="navbar-brand" href="#">LSP Tester UI</a>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            <li class="nav-item">
+              <a class="nav-link" href="jsonrpc-tester.html">JSON-RPC Tester</a>
+            </li>
+          </ul>
+        </div>
         <form class="d-inline-flex gap-1" role="actions">
           <button
             class="btn btn-primary btn-success"
@@ -151,10 +154,10 @@
           updateTooltip() {
             setTimeout(() => {
               const tooltipTriggerList = document.querySelectorAll(
-                '[data-bs-toggle="tooltip"]'
+                '[data-bs-toggle="tooltip"]',
               );
               const tooltipList = [...tooltipTriggerList].map(
-                (tooltipTriggerEl) => new bootstrap.Tooltip(tooltipTriggerEl)
+                (tooltipTriggerEl) => new bootstrap.Tooltip(tooltipTriggerEl),
               );
             }, 0);
           },
