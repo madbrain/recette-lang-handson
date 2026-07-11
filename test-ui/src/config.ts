@@ -10,6 +10,7 @@ select({
     { name: "Rust", value: "rust" },
     { name: "Go", value: "go" },
     { name: "Kotlin", value: "kotlin" },
+    { name: "Java", value: "java" },
   ],
 }).then((answer) => {
   let config: any = {};
@@ -29,6 +30,14 @@ select({
         config.cwd = kotlinRoot;
         config.command = resolve(kotlinRoot, "gradlew");
         config.args = ["--console=plain", "--quiet", "run"];
+      }
+      break;
+    case "java":
+      {
+        const javaRoot = resolve(projectRoot, "server-java");
+        config.cwd = javaRoot;
+        config.command = resolve(javaRoot, "mvnw");
+        config.args = ["--quiet", "compile", "exec:java"];
       }
       break;
     case "rust":
