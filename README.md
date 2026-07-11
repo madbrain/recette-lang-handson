@@ -37,7 +37,8 @@ run `pnpm run config` and select one of the following target plateform:
 - Python
 - Go
 - Rust
-- Java/Kotlin
+- Kotlin
+- Java
 
 this will produced the `config.json` configuration file.
 
